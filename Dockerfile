@@ -11,14 +11,14 @@ WORKDIR /app/frontend
 # Copy frontend package files
 COPY frontend/package.json frontend/package-lock.json ./
 
-# Install frontend dependencies with timeout settings
-RUN npm ci --only=production || npm install
+# Install frontend dependencies with timeout settings and debug
+RUN npm ci || (echo "npm ci failed, trying npm install" && npm install)
 
 # Copy frontend source code
 COPY frontend/ ./
 
 # Build frontend for production
-RUN npm run build
+RUN npx react-scripts build
 
 # Stage 2: Python runtime with backend
 FROM python:3.11-slim AS backend

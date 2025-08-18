@@ -30,6 +30,8 @@ DOCKER_USERNAME: your_dockerhub_username
 DOCKER_PASSWORD: your_dockerhub_access_token
 ```
 
+**Note**: The workflow automatically uses your GitHub repository owner name (`github.repository_owner`) for the Docker image namespace. If your Docker Hub username differs from your GitHub username, you can override this by updating the workflow file.
+
 ### 4. Update GitHub Actions Workflow (if needed)
 
 The workflow file `.github/workflows/docker-publish.yml` is already configured to use these secrets.
@@ -78,16 +80,16 @@ Once published, users can run:
 
 ```bash
 # Latest stable version
-docker run -p 8000:8000 your-username/neuralnotes-io:latest
+docker run -p 8000:8000 thecoder8890/neuralnotes-io:latest
 
 # Specific version
-docker run -p 8000:8000 your-username/neuralnotes-io:v1.0.0
+docker run -p 8000:8000 thecoder8890/neuralnotes-io:v1.0.0
 
 # With environment variables
 docker run -p 8000:8000 \
   -e OPENAI_API_KEY=sk-... \
   -v neuralnotes_data:/app/data \
-  your-username/neuralnotes-io:latest
+  thecoder8890/neuralnotes-io:latest
 ```
 
 ## 🔍 Monitoring and Maintenance
