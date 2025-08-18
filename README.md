@@ -40,12 +40,39 @@ DocuGen AI is an intelligent development assistant that accelerates project setu
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Option 1: Docker (Recommended)
+
+**Using Docker Compose:**
+```bash
+git clone https://github.com/thecoder8890/neuralnotes.io.git
+cd neuralnotes.io
+cp .env.example .env
+# Edit .env and add your OpenAI API key (optional)
+docker-compose up -d
+```
+
+**Using pre-built image:**
+```bash
+docker run -d \
+  --name neuralnotes-io \
+  -p 8000:8000 \
+  -e OPENAI_API_KEY=your_openai_api_key_here \
+  -v neuralnotes_data:/app/data \
+  thecoder8890/neuralnotes-io:latest
+```
+
+Access the application at http://localhost:8000
+
+📖 **[Complete Docker Guide](DOCKER.md)**
+
+### Option 2: Local Development
+
+#### Prerequisites
 - Python 3.8+
 - Node.js 16+
 - OpenAI API key (optional, fallback generation available)
 
-### Installation
+#### Installation
 
 1. **Clone the repository**
    ```bash
@@ -73,7 +100,7 @@ DocuGen AI is an intelligent development assistant that accelerates project setu
 
 5. **Start the application**
    
-   **Option 1: Development mode (separate terminals)**
+   **Option A: Development mode (separate terminals)**
    ```bash
    # Terminal 1: Start backend
    python main.py
@@ -82,7 +109,7 @@ DocuGen AI is an intelligent development assistant that accelerates project setu
    cd frontend && npm start
    ```
    
-   **Option 2: Production mode**
+   **Option B: Production mode**
    ```bash
    # Build frontend
    cd frontend && npm run build && cd ..
@@ -232,6 +259,43 @@ cd frontend && npm test
 - [ ] User accounts and project history
 - [ ] Feedback system and quality improvements
 - [ ] Advanced prompt engineering and context optimization
+
+## 🚀 Deployment
+
+### Docker Hub
+
+Pre-built Docker images are available on Docker Hub:
+- **Latest stable**: `thecoder8890/neuralnotes-io:latest`
+- **Version tags**: `thecoder8890/neuralnotes-io:v1.0.0`
+
+### Cloud Deployment
+
+#### Heroku
+```bash
+# Using Heroku Container Registry
+heroku container:push web --app your-app-name
+heroku container:release web --app your-app-name
+```
+
+#### AWS ECS / Azure Container Instances / Google Cloud Run
+See [DOCKER.md](DOCKER.md) for complete cloud deployment guides.
+
+#### Kubernetes
+```bash
+kubectl apply -f k8s/deployment.yaml
+```
+
+### Environment Setup
+
+**Required for full functionality:**
+- `OPENAI_API_KEY`: Your OpenAI API key
+
+**Optional configuration:**
+- `DEBUG=false`: Production mode
+- `HOST=0.0.0.0`: Listen on all interfaces
+- `PORT=8000`: Application port
+
+📖 **[Complete Deployment Guide](DOCKER.md)**
 
 ## 📝 License
 
