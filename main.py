@@ -21,22 +21,29 @@ try:
     CORE_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Some dependencies are missing: {e}")
-    print("The application will run with limited functionality.")
-    CORE_AVAILABLE = False
-    
-    # Minimal fallback schemas
-    from pydantic import BaseModel
-    
-    class GenerationRequest(BaseModel):
-        doc_id: str
-        prompt: str
-        technology: Optional[str] = None
-    
-    class GenerationResponse(BaseModel):
-        project_id: str
-        files: List[dict]
-        structure: dict
-        instructions: str
+    print("Using simplified mode for demonstration.")
+    try:
+        from backend.core.document_processor_simple import DocumentProcessor
+        from backend.core.code_generator_simple import CodeGenerator
+        from backend.models.schemas import GenerationRequest, GenerationResponse
+        CORE_AVAILABLE = True
+    except ImportError as e2:
+        print(f"Error: Cannot load simplified modules: {e2}")
+        CORE_AVAILABLE = False
+        
+        # Minimal fallback schemas
+        from pydantic import BaseModel
+        
+        class GenerationRequest(BaseModel):
+            doc_id: str
+            prompt: str
+            technology: Optional[str] = None
+        
+        class GenerationResponse(BaseModel):
+            project_id: str
+            files: List[dict]
+            structure: dict
+            instructions: str
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
