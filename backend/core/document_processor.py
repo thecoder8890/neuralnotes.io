@@ -7,11 +7,14 @@ from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
+try:
+    from langchain_community.embeddings import OpenAIEmbeddings
+except ImportError:
+    from langchain.embeddings import OpenAIEmbeddings
 import chromadb
 from chromadb.config import Settings
 import markdown
-import PyPDF2
+import pypdf
 import io
 
 logger = logging.getLogger(__name__)
@@ -138,7 +141,7 @@ class DocumentProcessor:
         """Extract text from PDF content"""
         try:
             pdf_file = io.BytesIO(file_content)
-            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            pdf_reader = pypdf.PdfReader(pdf_file)
             
             text = ""
             for page in pdf_reader.pages:

@@ -7,6 +7,7 @@ import io
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import openai
+from openai import AsyncOpenAI
 from backend.core.document_processor import DocumentProcessor
 from backend.models.schemas import GenerationResponse, FileContent, Technology
 
@@ -23,8 +24,7 @@ class CodeGenerator:
         """Initialize OpenAI client"""
         api_key = os.getenv("OPENAI_API_KEY")
         if api_key:
-            openai.api_key = api_key
-            self.openai_client = openai
+            self.openai_client = AsyncOpenAI(api_key=api_key)
         else:
             logger.warning("OpenAI API key not found. Code generation will be limited.")
     
@@ -138,7 +138,7 @@ Each file must have 'name', 'content', and 'type' properties.
     async def _call_openai_api(self, system_prompt: str, user_prompt: str) -> str:
         """Call OpenAI API with prompts"""
         try:
-            response = await self.openai_client.ChatCompletion.acreate(
+            response = await self.openai_client.chat.completions.create(
                 model="gpt-4",
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -154,7 +154,7 @@ Each file must have 'name', 'content', and 'type' properties.
             logger.error(f"Error calling OpenAI API: {str(e)}")
             # Fallback to gpt-3.5-turbo if gpt-4 fails
             try:
-                response = await self.openai_client.ChatCompletion.acreate(
+                response = await self.openai_client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[
                         {"role": "system", "content": system_prompt},
