@@ -7,7 +7,7 @@ import io
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import openai
-from openai import OpenAI, AsyncOpenAI
+from openai import AsyncOpenAI
 from backend.core.document_processor import DocumentProcessor
 from backend.models.schemas import GenerationResponse, FileContent, Technology
 
