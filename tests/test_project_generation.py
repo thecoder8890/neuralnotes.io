@@ -4,10 +4,6 @@ Validates that Spring Boot, Django, and React.js project generation
 works reliably in the simplified (fallback) code generator.
 """
 import pytest
-import sys
-import os
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.models.schemas import Technology, FileContent, GenerationResponse
 from backend.core.code_generator_simple import CodeGenerator

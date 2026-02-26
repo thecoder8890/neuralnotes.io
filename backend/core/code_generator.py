@@ -514,7 +514,7 @@ The application will start in debug mode with auto-reloading.
         files = [
             FileContent(
                 name="requirements.txt",
-                content="Django==4.2.8\npython-dotenv==1.0.0",
+                content="Django==4.2.11\npython-dotenv==1.0.0",
                 type="text"
             ),
             FileContent(
@@ -804,7 +804,7 @@ The application will start with nodemon for auto-reloading.
     "lint": "next lint"
   }},
   "dependencies": {{
-    "next": "14.0.4",
+    "next": "14.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   }},
