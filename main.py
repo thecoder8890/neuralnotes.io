@@ -70,6 +70,8 @@ else:
 
 @app.get("/")
 async def root():
+    if os.path.exists("frontend/build/index.html"):
+        return FileResponse("frontend/build/index.html")
     return {"message": "DocuGen AI - Documentation-aware project scaffolding engine"}
 
 @app.post("/api/process-documentation")
