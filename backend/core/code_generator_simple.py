@@ -714,6 +714,790 @@ The Flask application is ready for API development and includes CORS for fronten
         
         return files, structure, instructions
     
+    def _generate_django_project(self, prompt: str) -> tuple:
+        """Generate Django project"""
+        project_name = "django_app"
+
+        has_api = 'api' in prompt.lower() or 'rest' in prompt.lower()
+        has_auth = 'auth' in prompt.lower() or 'login' in prompt.lower()
+        has_db = 'database' in prompt.lower() or 'model' in prompt.lower() or 'sql' in prompt.lower()
+
+        requirements = """Django==4.2.8
+python-dotenv==1.0.0""" + ("""
+djangorestframework==3.14.0""" if has_api else "") + ("""
+django-cors-headers==4.3.1""" if has_api else "")
+
+        files = [
+            FileContent(
+                name="requirements.txt",
+                content=requirements,
+                type="text"
+            ),
+            FileContent(
+                name=f"{project_name}/settings.py",
+                content=f"""import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key-change-in-production')
+
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
+
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    {'"rest_framework",' if has_api else ''}
+    {'"corsheaders",' if has_api else ''}
+    'core',
+]
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    {'"corsheaders.middleware.CorsMiddleware",' if has_api else ''}
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+ROOT_URLCONF = '{project_name}.urls'
+
+TEMPLATES = [
+    {{
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {{
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        }},
+    }},
+]
+
+WSGI_APPLICATION = '{project_name}.wsgi.application'
+
+DATABASES = {{
+    'default': {{
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }}
+}}
+
+STATIC_URL = '/static/'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+{f"CORS_ALLOW_ALL_ORIGINS = DEBUG" if has_api else ""}
+{f"REST_FRAMEWORK = {{'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny']}}" if has_api else ""}
+""",
+                type="text"
+            ),
+            FileContent(
+                name=f"{project_name}/urls.py",
+                content=f"""from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('core.urls')),
+]
+""",
+                type="text"
+            ),
+            FileContent(
+                name=f"{project_name}/wsgi.py",
+                content=f"""import os
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', '{project_name}.settings')
+
+application = get_wsgi_application()
+""",
+                type="text"
+            ),
+            FileContent(
+                name="core/__init__.py",
+                content="",
+                type="text"
+            ),
+            FileContent(
+                name="core/models.py",
+                content="""from django.db import models
+
+
+class Item(models.Model):
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['-created_at']
+""",
+                type="text"
+            ),
+            FileContent(
+                name="core/views.py",
+                content=f"""from django.http import JsonResponse
+{"from rest_framework.decorators import api_view" if has_api else ""}
+{"from rest_framework.response import Response" if has_api else ""}
+from .models import Item
+
+
+{"@api_view(['GET'])" if has_api else ""}
+def hello(request):
+    {"return Response({'message': 'Hello from Django REST API!', 'status': 'running'})" if has_api else "return JsonResponse({'message': 'Hello from Django!', 'status': 'running'})"}
+
+
+{"@api_view(['GET'])" if has_api else ""}
+def items_list(request):
+    items = list(Item.objects.values('id', 'name', 'description', 'created_at'))
+    {"return Response({'items': items})" if has_api else "return JsonResponse({'items': items})"}
+""",
+                type="text"
+            ),
+            FileContent(
+                name="core/urls.py",
+                content="""from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.hello, name='hello'),
+    path('api/items/', views.items_list, name='items-list'),
+]
+""",
+                type="text"
+            ),
+            FileContent(
+                name="manage.py",
+                content=f"""#!/usr/bin/env python
+import os
+import sys
+
+
+def main():
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', '{project_name}.settings')
+    try:
+        from django.core.management import execute_from_command_line
+    except ImportError as exc:
+        raise ImportError(
+            "Couldn't import Django. Are you sure it's installed?"
+        ) from exc
+    execute_from_command_line(sys.argv)
+
+
+if __name__ == '__main__':
+    main()
+""",
+                type="text"
+            ),
+            FileContent(
+                name=".env.example",
+                content="""SECRET_KEY=your-secret-key-here
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+""",
+                type="text"
+            ),
+            FileContent(
+                name="README.md",
+                content=f"""# {project_name}
+
+Django application generated based on: {prompt}
+
+## Getting Started
+
+### Prerequisites
+- Python 3.8+
+- pip
+
+### Running the Application
+
+1. Create virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\\Scripts\\activate
+   ```
+
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Set up environment:
+   ```bash
+   cp .env.example .env
+   ```
+
+4. Run migrations:
+   ```bash
+   python manage.py migrate
+   ```
+
+5. Run the development server:
+   ```bash
+   python manage.py runserver
+   ```
+
+6. Access the application:
+   - App: http://localhost:8000
+   - Admin: http://localhost:8000/admin
+
+## Features
+
+- Django web framework
+- SQLite database (configurable)
+{f'- Django REST Framework for API endpoints' if has_api else ''}
+{f'- CORS support for frontend integration' if has_api else ''}
+{f'- Authentication support' if has_auth else ''}
+""",
+                type="text"
+            ),
+        ]
+
+        structure = {
+            project_name: ["settings.py", "urls.py", "wsgi.py"],
+            "core": ["__init__.py", "models.py", "views.py", "urls.py"],
+            "files": ["manage.py", "requirements.txt", ".env.example", "README.md"]
+        }
+
+        instructions = f"""# Setup Instructions
+
+1. Prerequisites:
+   - Install Python 3.8 or later
+
+2. Setup and run:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   cp .env.example .env
+   python manage.py migrate
+   python manage.py runserver
+   ```
+
+3. Access the application:
+   - Development server: http://localhost:8000
+   - Admin panel: http://localhost:8000/admin (create superuser first)
+
+4. Create admin superuser:
+   ```bash
+   python manage.py createsuperuser
+   ```
+
+5. API endpoints:
+   - GET / - Hello message
+   - GET /api/items/ - List items
+
+The Django application includes a core app with models, views, and URL routing."""
+
+        return files, structure, instructions
+
+    def _generate_express_project(self, prompt: str) -> tuple:
+        """Generate Express.js project"""
+        project_name = "express-app"
+
+        has_db = 'database' in prompt.lower() or 'mongo' in prompt.lower() or 'sql' in prompt.lower()
+        has_auth = 'auth' in prompt.lower() or 'jwt' in prompt.lower() or 'login' in prompt.lower()
+        has_mongo = 'mongo' in prompt.lower()
+
+        dependencies: dict = {
+            "express": "^4.18.2",
+            "dotenv": "^16.3.1",
+            "cors": "^2.8.5",
+        }
+        if has_auth:
+            dependencies["jsonwebtoken"] = "^9.0.2"
+            dependencies["bcryptjs"] = "^2.4.3"
+        if has_mongo:
+            dependencies["mongoose"] = "^8.0.3"
+
+        dev_dependencies: dict = {
+            "nodemon": "^3.0.2"
+        }
+
+        deps_json = ',\n    '.join(f'"{k}": "{v}"' for k, v in dependencies.items())
+        dev_deps_json = ',\n    '.join(f'"{k}": "{v}"' for k, v in dev_dependencies.items())
+
+        files = [
+            FileContent(
+                name="package.json",
+                content=f"""{{
+  "name": "{project_name}",
+  "version": "1.0.0",
+  "description": "Express.js application generated by DocuGen AI",
+  "main": "src/index.js",
+  "scripts": {{
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  }},
+  "dependencies": {{
+    {deps_json}
+  }},
+  "devDependencies": {{
+    {dev_deps_json}
+  }}
+}}""",
+                type="text"
+            ),
+            FileContent(
+                name="src/index.js",
+                content=f"""const express = require('express');
+const cors = require('cors');
+require('dotenv').config();
+{"const mongoose = require('mongoose');" if has_mongo else ""}
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Routes
+app.use('/api', require('./routes/api'));
+
+// Health check
+app.get('/health', (req, res) => {{
+  res.json({{ status: 'healthy', service: '{project_name}' }});
+}});
+
+{"// MongoDB connection" if has_mongo else ""}
+{f"mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/{project_name}').then(() => console.log('MongoDB connected')).catch(err => console.error('MongoDB error:', err));" if has_mongo else ""}
+
+app.listen(PORT, () => {{
+  console.log(`Server running on port ${{PORT}}`);
+}});
+
+module.exports = app;
+""",
+                type="text"
+            ),
+            FileContent(
+                name="src/routes/api.js",
+                content=f"""const express = require('express');
+const router = express.Router();
+{"const jwt = require('jsonwebtoken');" if has_auth else ""}
+
+// Welcome route
+router.get('/', (req, res) => {{
+  res.json({{ message: 'Hello from Express.js API!', version: '1.0.0' }});
+}});
+
+// Example items endpoint
+const items = [
+  {{ id: 1, name: 'Item 1', description: 'First item' }},
+  {{ id: 2, name: 'Item 2', description: 'Second item' }},
+];
+
+router.get('/items', (req, res) => {{
+  res.json({{ items, total: items.length }});
+}});
+
+router.get('/items/:id', (req, res) => {{
+  const item = items.find(i => i.id === parseInt(req.params.id));
+  if (!item) return res.status(404).json({{ error: 'Item not found' }});
+  res.json(item);
+}});
+
+router.post('/items', (req, res) => {{
+  const {{ name, description }} = req.body;
+  if (!name) return res.status(400).json({{ error: 'Name is required' }});
+  const newItem = {{ id: items.length + 1, name, description: description || '' }};
+  items.push(newItem);
+  res.status(201).json(newItem);
+}});
+
+{"// Auth routes" if has_auth else ""}
+{f"""router.post('/auth/login', (req, res) => {{
+  const {{ username, password }} = req.body;
+  // TODO: validate credentials against your user store
+  if (username === 'admin' && password === 'password') {{
+    const token = jwt.sign({{ username }}, process.env.JWT_SECRET || 'secret', {{ expiresIn: '1h' }});
+    res.json({{ token }});
+  }} else {{
+    res.status(401).json({{ error: 'Invalid credentials' }});
+  }}
+}});""" if has_auth else ""}
+
+module.exports = router;
+""",
+                type="text"
+            ),
+            FileContent(
+                name=".env.example",
+                content=f"""PORT=3000
+NODE_ENV=development
+{"JWT_SECRET=your-jwt-secret-here" if has_auth else ""}
+{"MONGODB_URI=mongodb://localhost:27017/" + project_name if has_mongo else ""}
+""",
+                type="text"
+            ),
+            FileContent(
+                name=".gitignore",
+                content="""node_modules/
+.env
+*.log
+""",
+                type="text"
+            ),
+            FileContent(
+                name="README.md",
+                content=f"""# {project_name}
+
+Express.js application generated based on: {prompt}
+
+## Getting Started
+
+### Prerequisites
+- Node.js 16+
+- npm
+
+### Running the Application
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Set up environment:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Run development server:
+   ```bash
+   npm run dev
+   ```
+
+4. Access the application:
+   - API: http://localhost:3000/api
+   - Health: http://localhost:3000/health
+
+## API Endpoints
+
+- `GET /health` - Health check
+- `GET /api` - Welcome message
+- `GET /api/items` - List all items
+- `GET /api/items/:id` - Get item by ID
+- `POST /api/items` - Create new item
+{f'- `POST /api/auth/login` - Authenticate user' if has_auth else ''}
+
+## Features
+
+- Express.js web framework
+- CORS enabled
+- Environment configuration
+{f'- JWT authentication' if has_auth else ''}
+{f'- MongoDB/Mongoose integration' if has_mongo else ''}
+""",
+                type="text"
+            ),
+        ]
+
+        structure = {
+            "src": {
+                "routes": ["api.js"],
+            },
+            "files": ["package.json", ".env.example", ".gitignore", "README.md"]
+        }
+
+        instructions = f"""# Setup Instructions
+
+1. Prerequisites:
+   - Install Node.js 16 or later
+
+2. Install and run:
+   ```bash
+   npm install
+   cp .env.example .env
+   npm run dev
+   ```
+
+3. Access the application:
+   - API server: http://localhost:3000
+   - Development mode includes auto-reload via nodemon
+
+4. For production:
+   ```bash
+   npm start
+   ```
+
+The Express.js application includes CORS support, structured routing, and example CRUD endpoints."""
+
+        return files, structure, instructions
+
+    def _generate_nextjs_project(self, prompt: str) -> tuple:
+        """Generate Next.js project"""
+        project_name = "nextjs-app"
+
+        has_api = 'api' in prompt.lower() or 'backend' in prompt.lower()
+        has_auth = 'auth' in prompt.lower() or 'login' in prompt.lower()
+
+        files = [
+            FileContent(
+                name="package.json",
+                content=f"""{{
+  "name": "{project_name}",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {{
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  }},
+  "dependencies": {{
+    "next": "14.0.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }},
+  "devDependencies": {{
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "typescript": "^5.3.3",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "14.0.4"
+  }}
+}}""",
+                type="text"
+            ),
+            FileContent(
+                name="tsconfig.json",
+                content="""{
+  "compilerOptions": {
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{"name": "next"}],
+    "paths": {"@/*": ["./src/*"]}
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}""",
+                type="text"
+            ),
+            FileContent(
+                name="next.config.js",
+                content="""/** @type {import('next').NextConfig} */
+const nextConfig = {}
+
+module.exports = nextConfig
+""",
+                type="text"
+            ),
+            FileContent(
+                name="src/app/layout.tsx",
+                content=f"""import type {{ Metadata }} from 'next'
+
+export const metadata: Metadata = {{
+  title: '{project_name}',
+  description: 'Generated by DocuGen AI',
+}}
+
+export default function RootLayout({{
+  children,
+}}: {{
+  children: React.ReactNode
+}}) {{
+  return (
+    <html lang="en">
+      <body>{{children}}</body>
+    </html>
+  )
+}}
+""",
+                type="text"
+            ),
+            FileContent(
+                name="src/app/page.tsx",
+                content=f"""export default function Home() {{
+  return (
+    <main style={{{{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}}}>
+      <h1>Welcome to {project_name}</h1>
+      <p>Generated based on: {prompt}</p>
+      <p>
+        Get started by editing{' '}
+        <code>src/app/page.tsx</code>
+      </p>
+      {f'<p><a href="/api/hello">View API example</a></p>' if has_api else ''}
+    </main>
+  )
+}}
+""",
+                type="text"
+            ),
+            FileContent(
+                name="src/app/globals.css",
+                content="""* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+""",
+                type="text"
+            ),
+        ]
+
+        if has_api:
+            files.append(FileContent(
+                name="src/app/api/hello/route.ts",
+                content="""import { NextResponse } from 'next/server'
+
+export async function GET() {
+  return NextResponse.json({
+    message: 'Hello from Next.js API!',
+    timestamp: new Date().toISOString(),
+  })
+}
+""",
+                type="text"
+            ))
+
+        files.extend([
+            FileContent(
+                name=".env.example",
+                content=f"""NEXTAUTH_SECRET=your-secret-here
+NEXTAUTH_URL=http://localhost:3000
+{"# Add your API keys below" if has_auth else ""}
+""",
+                type="text"
+            ),
+            FileContent(
+                name=".gitignore",
+                content="""node_modules/
+.next/
+.env
+*.log
+""",
+                type="text"
+            ),
+            FileContent(
+                name="README.md",
+                content=f"""# {project_name}
+
+Next.js application generated based on: {prompt}
+
+## Getting Started
+
+### Prerequisites
+- Node.js 18+
+- npm
+
+### Running the Application
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+3. Access the application:
+   - App: http://localhost:3000
+   {f'- API: http://localhost:3000/api/hello' if has_api else ''}
+
+## Project Structure
+
+- `src/app/` - App Router pages and layouts
+- `src/app/api/` - API route handlers
+- `public/` - Static assets
+
+## Features
+
+- Next.js 14 with App Router
+- TypeScript for type safety
+- Server and client components
+{f'- API route handlers' if has_api else ''}
+{f'- Authentication ready' if has_auth else ''}
+
+## Available Scripts
+
+- `npm run dev` - Development server
+- `npm run build` - Production build
+- `npm start` - Production server
+- `npm run lint` - Lint code
+""",
+                type="text"
+            ),
+        ])
+
+        structure = {
+            "src": {
+                "app": (["layout.tsx", "page.tsx", "globals.css", "api/hello/route.ts"]
+                        if has_api else ["layout.tsx", "page.tsx", "globals.css"]),
+            },
+            "files": ["package.json", "tsconfig.json", "next.config.js", ".env.example", ".gitignore", "README.md"]
+        }
+
+        instructions = f"""# Setup Instructions
+
+1. Prerequisites:
+   - Install Node.js 18 or later
+
+2. Install and run:
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+3. Access the application:
+   - Development server: http://localhost:3000
+   - Hot reloading is enabled
+
+4. Build for production:
+   ```bash
+   npm run build
+   npm start
+   ```
+
+The Next.js application uses the App Router with TypeScript and includes server-side rendering support."""
+
+        return files, structure, instructions
+
     def _generate_generic_project(self, prompt: str) -> tuple:
         """Generate generic project"""
         files = [
