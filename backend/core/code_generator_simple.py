@@ -242,8 +242,10 @@ Spring Boot application generated based on: {prompt}
                 "main": {
                     "java": {
                         "com": {
-                            "example": ["Application.java"],
-                            "controller": ["HomeController.java"]
+                            "example": {
+                                "files": ["Application.java"],
+                                "controller": ["HomeController.java"]
+                            }
                         }
                     },
                     "resources": ["application.properties"]
@@ -734,6 +736,11 @@ django-cors-headers==4.3.1""" if has_api else "")
                 type="text"
             ),
             FileContent(
+                name=f"{project_name}/__init__.py",
+                content="",
+                type="text"
+            ),
+            FileContent(
                 name=f"{project_name}/settings.py",
                 content=f"""import os
 from pathlib import Path
@@ -974,7 +981,7 @@ Django application generated based on: {prompt}
         ]
 
         structure = {
-            project_name: ["settings.py", "urls.py", "wsgi.py"],
+            project_name: ["__init__.py", "settings.py", "urls.py", "wsgi.py"],
             "core": ["__init__.py", "models.py", "views.py", "urls.py"],
             "files": ["manage.py", "requirements.txt", ".env.example", "README.md"]
         }
