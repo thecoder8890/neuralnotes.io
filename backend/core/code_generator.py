@@ -227,8 +227,14 @@ Each file must have 'name', 'content', and 'type' properties.
             return self._generate_spring_boot_fallback(prompt, project_name)
         elif technology == Technology.REACT:
             return self._generate_react_fallback(prompt, project_name)
+        elif technology == Technology.DJANGO:
+            return self._generate_django_fallback(prompt, project_name)
         elif technology == Technology.FLASK:
             return self._generate_flask_fallback(prompt, project_name)
+        elif technology == Technology.EXPRESS:
+            return self._generate_express_fallback(prompt, project_name)
+        elif technology == Technology.NEXTJS:
+            return self._generate_nextjs_fallback(prompt, project_name)
         else:
             return self._generate_generic_fallback(prompt, project_name)
     
@@ -499,6 +505,373 @@ if __name__ == '__main__':
 6. Visit: http://localhost:5000
 
 The application will start in debug mode with auto-reloading.
+"""
+        
+        return files, structure, instructions
+    
+    def _generate_django_fallback(self, prompt: str, project_name: str) -> tuple:
+        """Generate basic Django project"""
+        files = [
+            FileContent(
+                name="requirements.txt",
+                content="Django==4.2.8\npython-dotenv==1.0.0",
+                type="text"
+            ),
+            FileContent(
+                name=f"{project_name}/__init__.py",
+                content="",
+                type="text"
+            ),
+            FileContent(
+                name=f"{project_name}/settings.py",
+                content=f"""import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key-change-in-production')
+
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
+
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'core',
+]
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+ROOT_URLCONF = '{project_name}.urls'
+
+TEMPLATES = [
+    {{
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {{
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        }},
+    }},
+]
+
+WSGI_APPLICATION = '{project_name}.wsgi.application'
+
+DATABASES = {{
+    'default': {{
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }}
+}}
+
+STATIC_URL = '/static/'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+""",
+                type="text"
+            ),
+            FileContent(
+                name=f"{project_name}/urls.py",
+                content=f"""from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('core.urls')),
+]
+""",
+                type="text"
+            ),
+            FileContent(
+                name=f"{project_name}/wsgi.py",
+                content=f"""import os
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', '{project_name}.settings')
+
+application = get_wsgi_application()
+""",
+                type="text"
+            ),
+            FileContent(
+                name="core/__init__.py",
+                content="",
+                type="text"
+            ),
+            FileContent(
+                name="core/models.py",
+                content="""from django.db import models
+
+
+class Item(models.Model):
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['-created_at']
+""",
+                type="text"
+            ),
+            FileContent(
+                name="core/views.py",
+                content="""from django.http import JsonResponse
+from .models import Item
+
+
+def hello(request):
+    return JsonResponse({'message': 'Hello from Django!', 'status': 'running'})
+
+
+def items_list(request):
+    items = list(Item.objects.values('id', 'name', 'description', 'created_at'))
+    return JsonResponse({'items': items})
+""",
+                type="text"
+            ),
+            FileContent(
+                name="core/urls.py",
+                content="""from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.hello, name='hello'),
+    path('api/items/', views.items_list, name='items-list'),
+]
+""",
+                type="text"
+            ),
+            FileContent(
+                name="manage.py",
+                content=f"""#!/usr/bin/env python
+import os
+import sys
+
+
+def main():
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', '{project_name}.settings')
+    try:
+        from django.core.management import execute_from_command_line
+    except ImportError as exc:
+        raise ImportError(
+            "Couldn't import Django. Are you sure it's installed?"
+        ) from exc
+    execute_from_command_line(sys.argv)
+
+
+if __name__ == '__main__':
+    main()
+""",
+                type="text"
+            ),
+        ]
+        
+        structure = {
+            project_name: ["__init__.py", "settings.py", "urls.py", "wsgi.py"],
+            "core": ["__init__.py", "models.py", "views.py", "urls.py"],
+            "files": ["manage.py", "requirements.txt"]
+        }
+        
+        instructions = """
+# Setup Instructions
+
+1. Ensure you have Python 3.8+ installed
+2. Create a virtual environment: `python -m venv venv`
+3. Activate virtual environment:
+   - Windows: `venv\\Scripts\\activate`
+   - macOS/Linux: `source venv/bin/activate`
+4. Install dependencies: `pip install -r requirements.txt`
+5. Run migrations: `python manage.py migrate`
+6. Run: `python manage.py runserver`
+7. Visit: http://localhost:8000
+
+The application will start in debug mode with auto-reloading.
+"""
+        
+        return files, structure, instructions
+    
+    def _generate_express_fallback(self, prompt: str, project_name: str) -> tuple:
+        """Generate basic Express.js project"""
+        files = [
+            FileContent(
+                name="package.json",
+                content=f"""{{
+  "name": "{project_name}",
+  "version": "1.0.0",
+  "description": "Express.js application generated by DocuGen AI",
+  "main": "src/index.js",
+  "scripts": {{
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  }},
+  "dependencies": {{
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5"
+  }},
+  "devDependencies": {{
+    "nodemon": "^3.0.2"
+  }}
+}}""",
+                type="text"
+            ),
+            FileContent(
+                name="src/index.js",
+                content=f"""const express = require('express');
+const cors = require('cors');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+
+app.get('/', (req, res) => {{
+  res.json({{ message: 'Hello from Express.js!', project: '{project_name}' }});
+}});
+
+app.get('/health', (req, res) => {{
+  res.json({{ status: 'healthy', service: '{project_name}' }});
+}});
+
+app.listen(PORT, () => {{
+  console.log(`Server running on port ${{PORT}}`);
+}});
+
+module.exports = app;
+""",
+                type="text"
+            ),
+        ]
+        
+        structure = {
+            "src": ["index.js"],
+            "files": ["package.json"]
+        }
+        
+        instructions = """
+# Setup Instructions
+
+1. Ensure you have Node.js 16+ and npm installed
+2. Navigate to the project directory
+3. Run: `npm install`
+4. Run: `npm run dev`
+5. Visit: http://localhost:3000
+
+The application will start with nodemon for auto-reloading.
+"""
+        
+        return files, structure, instructions
+    
+    def _generate_nextjs_fallback(self, prompt: str, project_name: str) -> tuple:
+        """Generate basic Next.js project"""
+        files = [
+            FileContent(
+                name="package.json",
+                content=f"""{{
+  "name": "{project_name}",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {{
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  }},
+  "dependencies": {{
+    "next": "14.0.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }},
+  "devDependencies": {{
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "typescript": "^5.3.3"
+  }}
+}}""",
+                type="text"
+            ),
+            FileContent(
+                name="src/app/layout.tsx",
+                content=f"""import type {{ Metadata }} from 'next'
+
+export const metadata: Metadata = {{
+  title: '{project_name}',
+  description: 'Generated by DocuGen AI',
+}}
+
+export default function RootLayout({{
+  children,
+}}: {{
+  children: React.ReactNode
+}}) {{
+  return (
+    <html lang="en">
+      <body>{{children}}</body>
+    </html>
+  )
+}}
+""",
+                type="text"
+            ),
+            FileContent(
+                name="src/app/page.tsx",
+                content=f"""export default function Home() {{
+  return (
+    <main style={{{{ padding: '2rem', fontFamily: 'system-ui, sans-serif' }}}}>
+      <h1>Welcome to {project_name}</h1>
+      <p>This is a Next.js application generated by DocuGen AI.</p>
+    </main>
+  )
+}}
+""",
+                type="text"
+            ),
+        ]
+        
+        structure = {
+            "src": {
+                "app": ["layout.tsx", "page.tsx"],
+            },
+            "files": ["package.json"]
+        }
+        
+        instructions = """
+# Setup Instructions
+
+1. Ensure you have Node.js 18+ and npm installed
+2. Navigate to the project directory
+3. Run: `npm install`
+4. Run: `npm run dev`
+5. Visit: http://localhost:3000
+
+The application will start in development mode with hot reloading.
 """
         
         return files, structure, instructions
