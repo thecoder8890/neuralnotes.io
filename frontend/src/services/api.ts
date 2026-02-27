@@ -28,6 +28,20 @@ export const apiService = {
     });
   },
 
+  uploadMultipleDocumentation: (files: File[]) => {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append('files', file);
+    });
+    return api.post('/api/upload-multiple-documentation', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
+  getSupportedFormats: () => api.get('/api/supported-formats'),
+
   // Project generation
   generateProject: (request: GenerationRequest): Promise<{ data: GenerationResponse }> =>
     api.post('/api/generate-project', request),

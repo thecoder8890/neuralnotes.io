@@ -10,6 +10,10 @@ from typing import Optional, List
 import io
 import zipfile
 
+# File upload configuration
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
+ALLOWED_EXTENSIONS = {'.pdf', '.md', '.markdown', '.txt', '.html', '.htm', '.rst', '.docx'}
+
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -84,16 +88,71 @@ async def process_documentation(url: str):
         logger.error(f"Error processing documentation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def _validate_upload(filename: str, content: bytes) -> None:
+    """Validate uploaded file extension and size."""
+    ext = os.path.splitext(filename or "")[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
+        )
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File size exceeds maximum allowed size of {MAX_FILE_SIZE // (1024 * 1024)} MB"
+        )
+
 @app.post("/api/upload-documentation")
 async def upload_documentation(file: UploadFile = File(...)):
-    """Upload and process documentation file"""
+    """Upload and process a single documentation file"""
     try:
         content = await file.read()
+        _validate_upload(file.filename, content)
         result = await document_processor.process_file(content, file.filename)
         return {"status": "success", "message": "Documentation uploaded and processed", "doc_id": result}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error uploading documentation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/upload-multiple-documentation")
+async def upload_multiple_documentation(files: List[UploadFile] = File(...)):
+    """Upload and process multiple documentation files"""
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
+
+    results = []
+    errors = []
+    for file in files:
+        try:
+            content = await file.read()
+            _validate_upload(file.filename, content)
+            doc_id = await document_processor.process_file(content, file.filename)
+            results.append({"filename": file.filename, "doc_id": doc_id, "status": "success"})
+        except HTTPException as he:
+            errors.append({"filename": file.filename, "error": he.detail})
+        except Exception as e:
+            logger.error(f"Error uploading {file.filename}: {str(e)}")
+            errors.append({"filename": file.filename, "error": str(e)})
+
+    if not results:
+        raise HTTPException(status_code=400, detail=f"All uploads failed: {errors}")
+
+    return {
+        "status": "success" if not errors else "partial",
+        "message": f"Processed {len(results)} of {len(results) + len(errors)} files",
+        "results": results,
+        "errors": errors,
+    }
+
+@app.get("/api/supported-formats")
+async def supported_formats():
+    """Return the list of supported file formats for upload"""
+    return {
+        "formats": sorted(ALLOWED_EXTENSIONS),
+        "max_file_size_mb": MAX_FILE_SIZE // (1024 * 1024),
+    }
 
 @app.post("/api/generate-project", response_model=GenerationResponse)
 async def generate_project(request: GenerationRequest):
