@@ -122,14 +122,18 @@ class DocumentProcessor:
     
     def _extract_text_from_file(self, file_content: bytes, filename: str) -> str:
         """Extract text from uploaded file based on file type"""
-        file_extension = filename.lower().split('.')[-1]
+        file_extension = os.path.splitext(filename or "")[1].lower().lstrip(".")
         
         if file_extension == 'pdf':
             return self._extract_text_from_pdf(file_content)
         elif file_extension in ['md', 'markdown']:
             return self._extract_text_from_markdown(file_content)
-        elif file_extension in ['txt', 'html']:
-            return file_content.decode('utf-8')
+        elif file_extension == 'rst':
+            return file_content.decode('utf-8', errors='replace')
+        elif file_extension == 'docx':
+            return self._extract_text_from_docx(file_content)
+        elif file_extension in ['txt', 'html', 'htm']:
+            return file_content.decode('utf-8', errors='replace')
         else:
             # Try to decode as text
             try:
@@ -161,6 +165,20 @@ class DocumentProcessor:
             return soup.get_text()
         except Exception as e:
             logger.error(f"Error extracting text from Markdown: {str(e)}")
+            raise
+    
+    def _extract_text_from_docx(self, file_content: bytes) -> str:
+        """Extract text from DOCX content"""
+        try:
+            import zipfile
+            docx_file = io.BytesIO(file_content)
+            with zipfile.ZipFile(docx_file) as zf:
+                xml_content = zf.read('word/document.xml')
+            soup = BeautifulSoup(xml_content, 'html.parser')
+            paragraphs = soup.find_all('w:t')
+            return ' '.join(p.get_text() for p in paragraphs)
+        except Exception as e:
+            logger.error(f"Error extracting text from DOCX: {str(e)}")
             raise
     
     async def _process_and_store(self, doc_id: str, text_content: str, url: Optional[str] = None, filename: Optional[str] = None):
