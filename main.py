@@ -120,6 +120,9 @@ async def download_project(project_id: str):
             media_type="application/zip",
             headers={"Content-Disposition": f"attachment; filename=project_{project_id}.zip"}
         )
+    except ValueError as e:
+        logger.error(f"Project not found: {project_id}")
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"Error downloading project: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
