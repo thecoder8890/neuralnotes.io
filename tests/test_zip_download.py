@@ -235,8 +235,8 @@ class TestDownloadEndpoint:
         assert zipfile.is_zipfile(io.BytesIO(response.content))
 
     @pytest.mark.asyncio
-    async def test_download_invalid_id_returns_error(self):
-        """Test that requesting a non-existent project returns an error."""
+    async def test_download_invalid_id_returns_not_found(self):
+        """Test that requesting a non-existent project returns 404."""
         from httpx import AsyncClient, ASGITransport
         from main import app
 
@@ -244,4 +244,4 @@ class TestDownloadEndpoint:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get("/api/download-project/nonexistent-id")
 
-        assert response.status_code == 500
+        assert response.status_code == 404
