@@ -134,7 +134,12 @@ async def upload_multiple_documentation(files: List[UploadFile] = File(...)):
             errors.append({"filename": file.filename, "error": he.detail})
         except Exception as e:
             logger.error(f"Error uploading {file.filename}: {str(e)}")
-            errors.append({"filename": file.filename, "error": str(e)})
+            errors.append(
+                {
+                    "filename": file.filename,
+                    "error": "Internal server error while processing file",
+                }
+            )
 
     if not results:
         raise HTTPException(status_code=400, detail=f"All uploads failed: {errors}")
