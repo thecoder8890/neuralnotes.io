@@ -74,7 +74,7 @@ class DocumentProcessor:
             return self._extract_text_from_pdf(file_content)
         elif ext in (".md", ".markdown"):
             return self._extract_text_from_markdown(file_content)
-        elif ext in (".rst",):
+        elif ext == ".rst":
             return self._extract_text_from_rst(file_content)
         elif ext in (".txt", ".html", ".htm"):
             return file_content.decode("utf-8", errors="replace")

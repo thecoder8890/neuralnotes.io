@@ -137,7 +137,7 @@ async def upload_multiple_documentation(files: List[UploadFile] = File(...)):
             errors.append({"filename": file.filename, "error": str(e)})
 
     if not results:
-        raise HTTPException(status_code=400, detail={"message": "All uploads failed", "errors": errors})
+        raise HTTPException(status_code=400, detail=f"All uploads failed: {errors}")
 
     return {
         "status": "success" if not errors else "partial",
