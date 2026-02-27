@@ -12,3 +12,4 @@ requests==2.32.4
 python-dotenv==1.0.0
 pypdf==6.7.3
 markdown==3.5.2
+langchain-core>=1.2.11
