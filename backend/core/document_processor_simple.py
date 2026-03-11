@@ -1,8 +1,7 @@
 import os
 import hashlib
-import asyncio
 import logging
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 from datetime import datetime
 import io
 
@@ -29,7 +28,7 @@ class DocumentProcessor:
                 "url": url,
                 "processed_at": datetime.now().isoformat(),
                 "type": "url",
-                "content": f"Simulated content from {url}"
+                "content": f"Simulated content from {url}",
             }
             
             logger.info(f"Document {doc_id} processed successfully")
@@ -65,6 +64,29 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Error processing file {filename}: {str(e)}")
             raise
+
+    def get_document_summary(self, doc_id: str) -> Dict[str, Any]:
+        """Return summary metadata for a processed document."""
+        doc = self.processed_docs.get(doc_id)
+        if not doc:
+            raise ValueError("Document not found")
+
+        content = doc.get("content", "")
+        source_type = doc.get("type", "file")
+        source_name = doc.get("filename") or doc.get("url") or "Untitled document"
+        normalized_preview = " ".join(content.split())
+
+        return {
+            "doc_id": doc_id,
+            "source_type": source_type,
+            "source_name": source_name,
+            "processed_at": doc.get("processed_at", datetime.now().isoformat()),
+            "status": "ready",
+            "char_count": len(content),
+            "approx_chunks": max(1, min(8, (len(content) + 799) // 800)) if content else 0,
+            "preview": normalized_preview[:280],
+            "file_size": doc.get("file_size"),
+        }
 
     def _extract_text_from_file(self, file_content: bytes, filename: str) -> str:
         """Extract text from uploaded file based on file type"""

@@ -2,13 +2,11 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel
 import os
 import sys
 import logging
 from typing import Optional, List
 import io
-import zipfile
 
 # File upload configuration
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
@@ -21,7 +19,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 try:
     from backend.core.document_processor import DocumentProcessor
     from backend.core.code_generator import CodeGenerator
-    from backend.models.schemas import GenerationRequest, GenerationResponse
+    from backend.models.schemas import GenerationRequest, GenerationResponse, DocumentSummary
     CORE_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Some dependencies are missing: {e}")
@@ -29,7 +27,7 @@ except ImportError as e:
     try:
         from backend.core.document_processor_simple import DocumentProcessor
         from backend.core.code_generator_simple import CodeGenerator
-        from backend.models.schemas import GenerationRequest, GenerationResponse
+        from backend.models.schemas import GenerationRequest, GenerationResponse, DocumentSummary
         CORE_AVAILABLE = True
     except ImportError as e2:
         print(f"Error: Cannot load simplified modules: {e2}")
@@ -48,6 +46,17 @@ except ImportError as e:
             files: List[dict]
             structure: dict
             instructions: str
+
+        class DocumentSummary(BaseModel):
+            doc_id: str
+            source_type: str
+            source_name: str
+            processed_at: str
+            status: str
+            char_count: int
+            approx_chunks: int
+            preview: str
+            file_size: Optional[int] = None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -158,6 +167,18 @@ async def supported_formats():
         "formats": sorted(ALLOWED_EXTENSIONS),
         "max_file_size_mb": MAX_FILE_SIZE // (1024 * 1024),
     }
+
+@app.get("/api/documents/{doc_id}", response_model=DocumentSummary)
+async def get_document_summary(doc_id: str):
+    """Return summary metadata for a processed document."""
+    try:
+        summary = document_processor.get_document_summary(doc_id)
+        return summary
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error fetching document summary for {doc_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch document summary")
 
 @app.post("/api/generate-project", response_model=GenerationResponse)
 async def generate_project(request: GenerationRequest):

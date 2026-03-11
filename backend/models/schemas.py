@@ -25,6 +25,17 @@ class GenerationResponse(BaseModel):
     files: List[FileContent] = Field(..., description="List of generated files")
     structure: Dict[str, Any] = Field(..., description="Project structure tree")
     instructions: str = Field(..., description="Setup and run instructions")
+
+class DocumentSummary(BaseModel):
+    doc_id: str = Field(..., description="ID of the processed document")
+    source_type: str = Field(..., description="Source type: url or file")
+    source_name: str = Field(..., description="Original URL or filename")
+    processed_at: str = Field(..., description="Processing timestamp in ISO format")
+    status: str = Field(default="ready", description="Processing status")
+    char_count: int = Field(default=0, description="Extracted character count")
+    approx_chunks: int = Field(default=0, description="Approximate number of indexed chunks")
+    preview: str = Field(default="", description="Short preview of the extracted content")
+    file_size: Optional[int] = Field(default=None, description="Uploaded file size in bytes when applicable")
     
 class DocumentInfo(BaseModel):
     doc_id: str

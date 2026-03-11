@@ -25,6 +25,23 @@ export interface DocumentInfo {
   status: string;
 }
 
+export interface DocumentSummary {
+  doc_id: string;
+  source_type: string;
+  source_name: string;
+  processed_at: string;
+  status: string;
+  char_count: number;
+  approx_chunks: number;
+  preview: string;
+  file_size?: number | null;
+}
+
+export interface SupportedFormatsResponse {
+  formats: string[];
+  max_file_size_mb: number;
+}
+
 export enum Technology {
   SPRING_BOOT = "spring_boot",
   DJANGO = "django",
