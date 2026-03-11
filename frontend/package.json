@@ -15,6 +15,12 @@
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32"
   },
+  "devDependencies": {
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/jest-dom": "^5.16.5",
+    "@testing-library/user-event": "^14.4.3",
+    "axios-mock-adapter": "^1.21.2"
+  },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
