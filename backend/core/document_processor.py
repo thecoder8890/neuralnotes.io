@@ -12,7 +12,6 @@ try:
 except ImportError:
     from langchain.embeddings import OpenAIEmbeddings
 import chromadb
-from chromadb.config import Settings
 import markdown
 import pypdf
 import io
@@ -23,6 +22,7 @@ class DocumentProcessor:
     def __init__(self):
         self.chroma_client = None
         self.embeddings = None
+        self.document_index: Dict[str, Dict[str, Any]] = {}
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200,
@@ -187,11 +187,12 @@ class DocumentProcessor:
             # Split text into chunks
             chunks = self.text_splitter.split_text(text_content)
             logger.info(f"Split document into {len(chunks)} chunks")
+            processed_at = datetime.now().isoformat()
             
             # Create or get collection
             collection = self.chroma_client.get_or_create_collection(
                 name=f"doc_{doc_id}",
-                metadata={"doc_id": doc_id, "url": url, "filename": filename, "processed_at": datetime.now().isoformat()}
+                metadata={"doc_id": doc_id, "url": url, "filename": filename, "processed_at": processed_at}
             )
             
             # Generate embeddings and store chunks
@@ -219,6 +220,14 @@ class DocumentProcessor:
                     )
             
             logger.info(f"Stored {len(chunks)} chunks for document {doc_id}")
+            self.document_index[doc_id] = self._build_document_summary(
+                doc_id=doc_id,
+                text_content=text_content,
+                processed_at=processed_at,
+                chunk_count=len(chunks),
+                url=url,
+                filename=filename,
+            )
             
         except Exception as e:
             logger.error(f"Error processing and storing document: {str(e)}")
@@ -261,3 +270,56 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Error querying documents: {str(e)}")
             return []
+
+    def get_document_summary(self, doc_id: str) -> Dict[str, Any]:
+        """Return summary metadata for a processed document."""
+        if doc_id in self.document_index:
+            return self.document_index[doc_id]
+
+        try:
+            collection = self.chroma_client.get_collection(f"doc_{doc_id}")
+            metadata = collection.metadata or {}
+            preview_result = collection.get(limit=1, include=["documents"])
+            preview = ""
+            documents = preview_result.get("documents") or []
+            if documents and documents[0]:
+                preview = " ".join(documents[0].split())[:280]
+
+            summary = {
+                "doc_id": doc_id,
+                "source_type": "url" if metadata.get("url") else "file",
+                "source_name": metadata.get("filename") or metadata.get("url") or "Stored document",
+                "processed_at": metadata.get("processed_at", datetime.now().isoformat()),
+                "status": "ready",
+                "char_count": 0,
+                "approx_chunks": collection.count(),
+                "preview": preview,
+                "file_size": None,
+            }
+            self.document_index[doc_id] = summary
+            return summary
+        except Exception as e:
+            logger.error(f"Error getting document summary for {doc_id}: {str(e)}")
+            raise ValueError("Document not found")
+
+    def _build_document_summary(
+        self,
+        doc_id: str,
+        text_content: str,
+        processed_at: str,
+        chunk_count: int,
+        url: Optional[str] = None,
+        filename: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        normalized_preview = " ".join(text_content.split())
+        return {
+            "doc_id": doc_id,
+            "source_type": "url" if url else "file",
+            "source_name": filename or url or "Stored document",
+            "processed_at": processed_at,
+            "status": "ready",
+            "char_count": len(text_content),
+            "approx_chunks": chunk_count,
+            "preview": normalized_preview[:280],
+            "file_size": None,
+        }

@@ -1,5 +1,10 @@
 import axios from 'axios';
-import { GenerationRequest, GenerationResponse } from '../types';
+import {
+  DocumentSummary,
+  GenerationRequest,
+  GenerationResponse,
+  SupportedFormatsResponse,
+} from '../types';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || '';
 
@@ -40,7 +45,11 @@ export const apiService = {
     });
   },
 
-  getSupportedFormats: () => api.get('/api/supported-formats'),
+  getSupportedFormats: (): Promise<{ data: SupportedFormatsResponse }> =>
+    api.get('/api/supported-formats'),
+
+  getDocumentSummary: (docId: string): Promise<{ data: DocumentSummary }> =>
+    api.get(`/api/documents/${docId}`),
 
   // Project generation
   generateProject: (request: GenerationRequest): Promise<{ data: GenerationResponse }> =>

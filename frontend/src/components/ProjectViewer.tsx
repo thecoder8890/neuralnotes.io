@@ -1,6 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import {
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Download,
+  File,
+  Folder,
+} from 'lucide-react';
+import { apiService } from '../services/api';
 import { FileContent } from '../types';
-import { Download, File, Folder, ChevronRight, ChevronDown, Copy, CheckCircle } from 'lucide-react';
 
 interface ProjectViewerProps {
   projectId: string;
@@ -8,17 +17,98 @@ interface ProjectViewerProps {
   instructions: string;
 }
 
+type TreeItem =
+  | { type: 'file'; file: FileContent }
+  | { type: 'folder'; children: Record<string, TreeItem> };
+
+function buildFileTree(files: FileContent[]): Record<string, TreeItem> {
+  const tree: Record<string, TreeItem> = {};
+
+  files.forEach((file) => {
+    const parts = file.name.split('/');
+    let current: Record<string, TreeItem> = tree;
+
+    parts.forEach((part, index) => {
+      const isFile = index === parts.length - 1;
+
+      if (isFile) {
+        current[part] = { type: 'file', file };
+        return;
+      }
+
+      if (!current[part] || current[part].type !== 'folder') {
+        current[part] = { type: 'folder', children: {} };
+      }
+
+      const nextFolder = current[part];
+      if (nextFolder.type === 'folder') {
+        current = nextFolder.children;
+      }
+    });
+  });
+
+  return tree;
+}
+
+function getInitialExpandedFolders(files: FileContent[]): Set<string> {
+  const expanded = new Set<string>();
+
+  files.forEach((file) => {
+    const folders = file.name.split('/').slice(0, -1);
+    let path = '';
+
+    folders.forEach((folder, index) => {
+      path = path ? `${path}/${folder}` : folder;
+      if (index < 2) {
+        expanded.add(path);
+      }
+    });
+  });
+
+  return expanded;
+}
+
+function sortTreeEntries(node: Record<string, TreeItem>): Array<[string, TreeItem]> {
+  return Object.entries(node).sort(([leftName, leftItem], [rightName, rightItem]) => {
+    if (leftItem.type !== rightItem.type) {
+      return leftItem.type === 'folder' ? -1 : 1;
+    }
+
+    return leftName.localeCompare(rightName);
+  });
+}
+
+function getDefaultSelectedFile(files: FileContent[]): FileContent | null {
+  if (files.length === 0) {
+    return null;
+  }
+
+  return (
+    files.find((file) => file.name.toLowerCase() === 'readme.md') ??
+    [...files].sort((left, right) => left.name.localeCompare(right.name))[0]
+  );
+}
+
 const ProjectViewer: React.FC<ProjectViewerProps> = ({ projectId, files, instructions }) => {
-  const [selectedFile, setSelectedFile] = useState<FileContent | null>(files[0] || null);
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-  const [copiedContent, setCopiedContent] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<FileContent | null>(getDefaultSelectedFile(files));
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(getInitialExpandedFolders(files));
+  const [copiedFileName, setCopiedFileName] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedFile(getDefaultSelectedFile(files));
+    setExpandedFolders(getInitialExpandedFolders(files));
+    setCopiedFileName(null);
+    setDownloadError(null);
+  }, [files, projectId]);
 
   const handleDownload = async () => {
+    setIsDownloading(true);
+    setDownloadError(null);
+
     try {
-      const { apiService } = await import('../services/api');
       const response = await apiService.downloadProject(projectId);
-      
-      // Create download link
       const blob = new Blob([response.data], { type: 'application/zip' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -29,155 +119,180 @@ const ProjectViewer: React.FC<ProjectViewerProps> = ({ projectId, files, instruc
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Download failed:', error);
+      setDownloadError('Download failed. Try again.');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
-  const copyToClipboard = async (content: string) => {
+  const copyToClipboard = async (file: FileContent) => {
     try {
-      await navigator.clipboard.writeText(content);
-      setCopiedContent(content);
-      setTimeout(() => setCopiedContent(null), 2000);
+      await navigator.clipboard.writeText(file.content);
+      setCopiedFileName(file.name);
+      window.setTimeout(() => setCopiedFileName(null), 2000);
     } catch (error) {
-      console.error('Copy failed:', error);
+      setCopiedFileName(null);
     }
-  };
-
-  // Build file tree structure
-  const buildFileTree = () => {
-    const tree: any = {};
-    
-    files.forEach(file => {
-      const parts = file.name.split('/');
-      let current = tree;
-      
-      for (let i = 0; i < parts.length - 1; i++) {
-        const part = parts[i];
-        if (!current[part]) {
-          current[part] = { _type: 'folder', _children: {} };
-        }
-        current = current[part]._children;
-      }
-      
-      const fileName = parts[parts.length - 1];
-      current[fileName] = { _type: 'file', _data: file };
-    });
-    
-    return tree;
   };
 
   const toggleFolder = (path: string) => {
-    const newExpanded = new Set(expandedFolders);
-    if (newExpanded.has(path)) {
-      newExpanded.delete(path);
-    } else {
-      newExpanded.add(path);
-    }
-    setExpandedFolders(newExpanded);
-  };
+    setExpandedFolders((previous) => {
+      const next = new Set(previous);
 
-  const renderFileTree = (node: any, path: string = '', level: number = 0) => {
-    return Object.entries(node).map(([name, item]: [string, any]) => {
-      const currentPath = path ? `${path}/${name}` : name;
-      const isExpanded = expandedFolders.has(currentPath);
-      
-      if (item._type === 'folder') {
-        return (
-          <div key={currentPath}>
-            <div
-              className={`flex items-center space-x-2 py-1 px-2 hover:bg-gray-100 cursor-pointer ${level > 0 ? `ml-${level * 4}` : ''}`}
-              onClick={() => toggleFolder(currentPath)}
-            >
-              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              <Folder size={16} className="text-blue-600" />
-              <span className="text-sm">{name}</span>
-            </div>
-            {isExpanded && (
-              <div>
-                {renderFileTree(item._children, currentPath, level + 1)}
-              </div>
-            )}
-          </div>
-        );
+      if (next.has(path)) {
+        next.delete(path);
       } else {
-        return (
-          <div
-            key={currentPath}
-            className={`flex items-center space-x-2 py-1 px-2 hover:bg-gray-100 cursor-pointer ${
-              selectedFile?.name === item._data.name ? 'bg-blue-50 border-r-2 border-blue-500' : ''
-            } ${level > 0 ? `ml-${(level + 1) * 4}` : 'ml-4'}`}
-            onClick={() => setSelectedFile(item._data)}
-          >
-            <File size={16} className="text-gray-600" />
-            <span className="text-sm">{name}</span>
-          </div>
-        );
+        next.add(path);
       }
+
+      return next;
     });
   };
 
-  const fileTree = buildFileTree();
+  const renderFileTree = (
+    node: Record<string, TreeItem>,
+    path = '',
+    depth = 0
+  ): React.ReactNode =>
+    sortTreeEntries(node).map(([name, item]) => {
+      const currentPath = path ? `${path}/${name}` : name;
+
+      if (item.type === 'folder') {
+        const isExpanded = expandedFolders.has(currentPath);
+
+        return (
+          <div key={currentPath}>
+            <button
+              type="button"
+              onClick={() => toggleFolder(currentPath)}
+              className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100"
+              style={{ paddingLeft: `${12 + depth * 14}px` }}
+            >
+              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              <Folder size={16} className="text-amber-700" />
+              <span className="font-medium">{name}</span>
+            </button>
+            {isExpanded && <div>{renderFileTree(item.children, currentPath, depth + 1)}</div>}
+          </div>
+        );
+      }
+
+      const isSelected = selectedFile?.name === item.file.name;
+
+      return (
+        <button
+          key={currentPath}
+          type="button"
+          onClick={() => setSelectedFile(item.file)}
+          className={`flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-left text-sm transition ${
+            isSelected
+              ? 'bg-amber-100 text-slate-950'
+              : 'text-slate-700 hover:bg-slate-100'
+          }`}
+          style={{ paddingLeft: `${22 + depth * 14}px` }}
+        >
+          <File size={16} className="flex-shrink-0 text-slate-500" />
+          <span className="truncate">{name}</span>
+        </button>
+      );
+    });
+
+  const totalLines = files.reduce((count, file) => count + file.content.split('\n').length, 0);
+  const fileTree = buildFileTree(files);
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Step 3: Review & Download</h2>
-        <button
-          onClick={handleDownload}
-          className="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 flex items-center space-x-2"
-        >
-          <Download size={18} />
-          <span>Download ZIP</span>
-        </button>
+    <section className="rounded-[32px] border border-white/70 bg-white/78 p-6 shadow-[0_24px_80px_rgba(28,35,38,0.08)] backdrop-blur">
+      <div className="flex flex-col gap-3 border-b border-slate-200/80 pb-5 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Step 03
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold text-slate-950">Review and export</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+            The viewer now resets correctly on fresh generations, keeps useful folders expanded,
+            and surfaces project size so larger outputs stay navigable.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
+            {files.length} files
+          </span>
+          <span className="rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
+            {totalLines} lines
+          </span>
+          <button
+            type="button"
+            onClick={handleDownload}
+            disabled={isDownloading}
+            className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+          >
+            <Download size={18} />
+            {isDownloading ? 'Preparing ZIP...' : 'Download ZIP'}
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* File Tree */}
-        <div className="lg:col-span-1">
-          <h3 className="font-medium mb-2">Project Structure</h3>
-          <div className="border rounded-md p-2 max-h-96 overflow-y-auto bg-gray-50">
+      <div className="mt-5 grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">
+        <div className="rounded-3xl border border-slate-200 bg-slate-50/85 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-base font-semibold text-slate-950">Project structure</h3>
+            <span className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
+              Explorer
+            </span>
+          </div>
+          <div className="max-h-[30rem] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-2">
             {renderFileTree(fileTree)}
           </div>
         </div>
 
-        {/* File Content */}
-        <div className="lg:col-span-2">
+        <div className="rounded-3xl border border-slate-200 bg-slate-50/85 p-4">
           {selectedFile ? (
             <div>
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-medium">{selectedFile.name}</h3>
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">{selectedFile.name}</p>
+                  <p className="text-sm text-slate-500">{selectedFile.type}</p>
+                </div>
                 <button
-                  onClick={() => copyToClipboard(selectedFile.content)}
-                  className="flex items-center space-x-1 text-sm text-gray-600 hover:text-gray-800"
+                  type="button"
+                  onClick={() => copyToClipboard(selectedFile)}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
                 >
-                  {copiedContent === selectedFile.content ? (
-                    <CheckCircle size={16} className="text-green-600" />
+                  {copiedFileName === selectedFile.name ? (
+                    <CheckCircle size={16} className="text-emerald-600" />
                   ) : (
                     <Copy size={16} />
                   )}
-                  <span>{copiedContent === selectedFile.content ? 'Copied!' : 'Copy'}</span>
+                  {copiedFileName === selectedFile.name ? 'Copied' : 'Copy file'}
                 </button>
               </div>
-              <pre className="bg-gray-100 p-4 rounded-md text-sm overflow-x-auto max-h-96 overflow-y-auto border">
+
+              <pre className="max-h-[30rem] overflow-auto rounded-[28px] border border-slate-200 bg-[#111827] p-4 text-sm leading-6 text-slate-100">
                 <code>{selectedFile.content}</code>
               </pre>
             </div>
           ) : (
-            <div className="text-center text-gray-500 py-8">
-              Select a file to view its content
+            <div className="flex min-h-[18rem] items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-white text-sm text-slate-500">
+              Select a file to inspect its contents.
             </div>
           )}
         </div>
       </div>
 
-      {/* Instructions */}
-      <div className="mt-6">
-        <h3 className="font-medium mb-2">Setup Instructions</h3>
-        <div className="bg-blue-50 p-4 rounded-md">
-          <pre className="whitespace-pre-wrap text-sm">{instructions}</pre>
-        </div>
+      <div className="mt-5 rounded-3xl border border-amber-200 bg-amber-50/80 p-5">
+        <h3 className="text-base font-semibold text-slate-950">Setup instructions</h3>
+        <pre className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">
+          {instructions}
+        </pre>
       </div>
-    </div>
+
+      {downloadError && (
+        <div className="mt-4 rounded-3xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+          {downloadError}
+        </div>
+      )}
+    </section>
   );
 };
 

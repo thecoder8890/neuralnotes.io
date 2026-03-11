@@ -81,6 +81,18 @@ class TestSimplifiedProcessorExtraction:
         assert processor.processed_docs[doc_id]["content"] == "Hello, this is a text document."
 
     @pytest.mark.asyncio
+    async def test_document_summary_contains_preview(self, processor):
+        content = b"Heading\n\nThis is enough content to build a preview."
+        doc_id = await processor.process_file(content, "guide.txt")
+        summary = processor.get_document_summary(doc_id)
+
+        assert summary["doc_id"] == doc_id
+        assert summary["source_type"] == "file"
+        assert summary["source_name"] == "guide.txt"
+        assert summary["char_count"] == len(content.decode())
+        assert "preview" in summary
+
+    @pytest.mark.asyncio
     async def test_process_markdown_file(self, processor):
         content = b"# Title\n\nThis is **bold** text."
         doc_id = await processor.process_file(content, "readme.md")
@@ -255,3 +267,38 @@ class TestSupportedFormatsEndpoint:
         assert ".rst" in data["formats"]
         assert ".docx" in data["formats"]
         assert data["max_file_size_mb"] == 50
+
+
+class TestDocumentSummaryEndpoint:
+    @pytest.mark.asyncio
+    async def test_returns_summary_for_processed_file(self):
+        from httpx import AsyncClient, ASGITransport
+        from main import app
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            upload_response = await client.post(
+                "/api/upload-documentation",
+                files={"file": ("notes.txt", b"Implementation details for a demo app", "text/plain")},
+            )
+            doc_id = upload_response.json()["doc_id"]
+
+            summary_response = await client.get(f"/api/documents/{doc_id}")
+
+        assert summary_response.status_code == 200
+        data = summary_response.json()
+        assert data["doc_id"] == doc_id
+        assert data["source_name"] == "notes.txt"
+        assert data["source_type"] == "file"
+        assert data["char_count"] > 0
+
+    @pytest.mark.asyncio
+    async def test_missing_document_returns_not_found(self):
+        from httpx import AsyncClient, ASGITransport
+        from main import app
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/documents/missing-doc")
+
+        assert response.status_code == 404
